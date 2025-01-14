@@ -525,3 +525,25 @@ footer a:hover {
 .notification-info {
     background: var(--secondary-color) !important;
 }
+
+/* Export Format Styles */
+.markdown-options {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+.markdown-options label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+/* Conditional Display */
+#exportFormat[value="json"] ~ .markdown-options {
+    display: none;
+}
+
+#exportFormat[value="markdown"] ~ .markdown-options {
+    display: block;
+}

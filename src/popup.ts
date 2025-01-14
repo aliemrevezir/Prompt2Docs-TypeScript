@@ -1,6 +1,7 @@
 import { ConversationItem, Settings, DEFAULT_SETTINGS, Metadata } from './types';
 import browser from 'webextension-polyfill';
 import Toastify from 'toastify-js';
+import { convertToMarkdown } from './utils/markdownConverter';
 
 let currentSettings: Settings = DEFAULT_SETTINGS;
 let selectedConversations: ConversationItem[] = [];
@@ -103,7 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const selectedData = selectedIndices.map(index => selectedConversations[index]);
             const formattedData = await formatConversationData(selectedData);
             
-            downloadJSON(formattedData);
+            downloadData(formattedData);
             
             showNotification('Conversations exported successfully', 'success');
         } catch (error) {
@@ -170,6 +171,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     });
+
+    // Export format change handler
+    const exportFormatSelect = document.getElementById('exportFormat') as HTMLSelectElement;
+    const markdownOptions = document.querySelector('.markdown-options') as HTMLElement;
+
+    exportFormatSelect?.addEventListener('change', (event) => {
+        const target = event.target as HTMLSelectElement;
+        if (target.value === 'markdown') {
+            markdownOptions?.classList.add('active');
+        } else {
+            markdownOptions?.classList.remove('active');
+        }
+    });
+
+    // Initialize markdown options visibility
+    if (currentSettings.exportFormat === 'markdown') {
+        markdownOptions?.classList.add('active');
+    }
 });
 
 // Add helper function for code block extraction
@@ -270,6 +289,17 @@ async function formatConversationData(conversations: ConversationItem[]): Promis
     
     // Add conversations
     formattedData.conversations = conversations.map(conversation => {
+        // For markdown export, keep the original structure
+        if (currentSettings.exportFormat === 'markdown') {
+            return {
+                prompt: conversation.prompt,
+                answer: conversation.answer,
+                codeBlocks: conversation.codeBlocks,
+                images: conversation.images
+            };
+        }
+        
+        // For JSON export, use the customized format
         const formattedConversation: any = {};
         
         if (currentSettings.includePrompts) {
@@ -297,24 +327,59 @@ async function formatConversationData(conversations: ConversationItem[]): Promis
     return formattedData;
 }
 
-function downloadJSON(data: any) {
-    const jsonString = currentSettings.prettyPrintJSON ? 
-        JSON.stringify(data, null, 2) : JSON.stringify(data);
-    
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    const filename = currentSettings.autoGenerateFilename ? 
-        `conversations_${getCurrentDateTime().replace(/[: ]/g, '_')}.json` : 
-        'conversations.json';
-    
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+async function downloadData(data: any) {
+    try {
+        let content: string;
+        let fileExtension: string;
+        let mimeType: string;
+
+        // Determine format based on settings
+        const isMarkdown = currentSettings.exportFormat === 'markdown';
+        
+        if (isMarkdown) {
+            try {
+                content = convertToMarkdown(data, currentSettings);
+                fileExtension = 'md';
+                mimeType = 'text/markdown';
+                showNotification('Markdown file created successfully', 'success');
+            } catch (error) {
+                console.error('Error converting to markdown:', error);
+                showNotification('Failed to create markdown file', 'error');
+                return;
+            }
+        } else {
+            try {
+                content = currentSettings.prettyPrintJSON ? 
+                    JSON.stringify(data, null, 2) : JSON.stringify(data);
+                fileExtension = 'json';
+                mimeType = 'application/json';
+                showNotification('JSON file created successfully', 'success');
+            } catch (error) {
+                console.error('Error creating JSON:', error);
+                showNotification('Failed to create JSON file', 'error');
+                return;
+            }
+        }
+
+        // Create and download the file
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        const filename = currentSettings.autoGenerateFilename ? 
+            `conversations_${getCurrentDateTime().replace(/[: ]/g, '_')}.${fileExtension}` : 
+            `conversations.${fileExtension}`;
+        
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Error in file download:', error);
+        showNotification('Failed to download file', 'error');
+    }
 }
 
 function displayConversations(conversations: ConversationItem[], elements: any) {

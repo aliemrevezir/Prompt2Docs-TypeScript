@@ -40,6 +40,7 @@ export interface Settings {
     promptLabel: string;
     responseLabel: string;
     autoGenerateFilename: boolean;
+    exportFormat: 'json' | 'markdown';
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -48,9 +49,10 @@ export const DEFAULT_SETTINGS: Settings = {
     includeResponses: true,
     includeMetadata: false,
     preserveLineBreaks: true,
-    formatCodeBlocks: false,
+    formatCodeBlocks: true,
     prettyPrintJSON: true,
     promptLabel: 'prompt',
     responseLabel: 'response',
-    autoGenerateFilename: true
+    autoGenerateFilename: true,
+    exportFormat: 'markdown'
 }; 
