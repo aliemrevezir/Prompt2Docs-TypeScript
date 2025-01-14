@@ -172,6 +172,86 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
+// Add helper function for code block extraction
+function extractCodeBlocks(text: string): { text: string; codeBlocks: Array<{ language: string; code: string }> } {
+    const codeBlocks: Array<{ language: string; code: string }> = [];
+    let modifiedText = text;
+    
+    // Handle different code block patterns
+    const patterns = [
+        // Standard markdown code blocks
+        /```(\w*)\n([\s\S]*?)```/g,
+        // ChatGPT's "Copy code" format
+        /Code:\s*(\w*)\s*Copy code\s*([\s\S]*?)(?=\n\w+:|$)/g,
+        // Inline code blocks with language prefix
+        /`([^`]+)`/g
+    ];
+
+    // Process each pattern
+    patterns.forEach((pattern, patternIndex) => {
+        let match;
+        let blockIndex = 0;
+        const tempText = modifiedText;
+        
+        while ((match = pattern.exec(tempText)) !== null) {
+            let language = '';
+            let code = '';
+            
+            // Handle different patterns
+            if (patternIndex === 0) { // Markdown code blocks
+                [, language, code] = match;
+            } else if (patternIndex === 1) { // ChatGPT format
+                [, language, code] = match;
+                // Clean up the code
+                code = code.replace(/Copy code/g, '').trim();
+            } else if (patternIndex === 2) { // Inline code
+                code = match[1];
+                // Try to detect language from context
+                const prevText = tempText.substring(Math.max(0, match.index - 20), match.index);
+                language = prevText.match(/\b(python|javascript|typescript|html|css|java|cpp|c\+\+|ruby|go|rust|php)\b/i)?.[1] || 'plaintext';
+            }
+            
+            // Clean up and normalize
+            language = language.toLowerCase().trim();
+            code = code.trim();
+            
+            // Skip empty code blocks
+            if (!code) continue;
+            
+            // Normalize language names
+            language = normalizeLanguage(language);
+            
+            codeBlocks.push({ language, code });
+            
+            // Replace with placeholder
+            modifiedText = modifiedText.replace(match[0], `[CODE_BLOCK_${blockIndex}]`);
+            blockIndex++;
+        }
+    });
+    
+    // Clean up the text
+    modifiedText = modifiedText
+        .replace(/\s*Copy code\s*/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    return { text: modifiedText, codeBlocks };
+}
+
+// Helper function to normalize language names
+function normalizeLanguage(lang: string): string {
+    const languageMap: { [key: string]: string } = {
+        'py': 'python',
+        'js': 'javascript',
+        'ts': 'typescript',
+        'cpp': 'c++',
+        'rb': 'ruby',
+        '': 'plaintext'
+    };
+    
+    return languageMap[lang] || lang;
+}
+
 async function formatConversationData(conversations: ConversationItem[]): Promise<any> {
     const formattedData: any = {};
     
@@ -200,6 +280,11 @@ async function formatConversationData(conversations: ConversationItem[]): Promis
         if (currentSettings.includeResponses) {
             formattedConversation[currentSettings.responseLabel] = currentSettings.preserveLineBreaks ? 
                 conversation.answer : conversation.answer.replace(/\n/g, ' ');
+            
+            // Add code blocks if enabled and available
+            if (currentSettings.formatCodeBlocks && conversation.codeBlocks && conversation.codeBlocks.length > 0) {
+                formattedConversation[`${currentSettings.responseLabel}CodeBlocks`] = conversation.codeBlocks;
+            }
         }
         
         if (conversation.images && conversation.images.length > 0) {

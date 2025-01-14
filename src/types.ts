@@ -1,7 +1,13 @@
+export interface CodeBlock {
+    language: string;
+    code: string;
+}
+
 export interface ConversationItem {
     prompt: string;
     answer: string;
     images?: string[];
+    codeBlocks?: CodeBlock[];
 }
 
 export interface Metadata {

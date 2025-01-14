@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import { ConversationItem, Message, XPathConfig } from './types';
+import { ConversationItem, Message } from './types';
 
 function getElementByXPath(xpath: string): Element | null {
     const result = document.evaluate(
@@ -29,22 +29,37 @@ function getAllElementsByXPath(xpath: string): Element[] {
     return elements;
 }
 
-function extractCodeBlocks(text: string): string {
-    const codeBlockRegex = /```[\s\S]*?```/g;
-    const matches = text.match(codeBlockRegex);
+function extractCodeBlocksFromArticle(article: Element): { language: string; code: string }[] {
+    const codeBlocks: { language: string; code: string }[] = [];
     
-    if (!matches) return text;
+    // Find all pre elements in the article
+    const preElements = article.querySelectorAll('pre');
     
-    let processedText = text;
-    matches.forEach(match => {
-        const code = match.replace(/^```\s*(\w+)?\s*\n?|\n?```$/g, '');
-        processedText = processedText.replace(match, `\`\`\`${code}\`\`\``);
+    preElements.forEach(pre => {
+        // Get language div (first div in pre)
+        const languageDiv = pre.querySelector('div[class*="language"]') || 
+                           pre.querySelector('div > div:first-child');
+                           
+        // Get code element
+        const codeElement = pre.querySelector('code');
+        
+        if (languageDiv && codeElement) {
+            const language = languageDiv.textContent?.trim().toLowerCase() || 'plaintext';
+            const code = codeElement.textContent?.trim() || '';
+            
+            if (code) {
+                codeBlocks.push({
+                    language: language.replace(/^language[-:]?\s*/i, ''),
+                    code: code
+                });
+            }
+        }
     });
     
-    return processedText;
+    return codeBlocks;
 }
 
-function extractData(config: XPathConfig): ConversationItem[] {
+function extractData(): ConversationItem[] {
     const extractedData: ConversationItem[] = [];
     const baseArticle = "/html/body/div[1]/div[2]/main/div[1]/div[1]/div/div/div/div/article";
     
@@ -67,7 +82,10 @@ function extractData(config: XPathConfig): ConversationItem[] {
         const responseElement = responseArticle.querySelector('.text-base');
         const answer = responseElement?.textContent?.trim() || '';
         
-        // Extract images from response
+        // Extract code blocks from response article
+        const codeBlocks = extractCodeBlocksFromArticle(responseArticle);
+        
+        // Extract images
         const images: string[] = [];
         const imageElements = responseArticle.querySelectorAll('img');
         imageElements.forEach(img => {
@@ -77,9 +95,10 @@ function extractData(config: XPathConfig): ConversationItem[] {
         
         if (prompt && answer) {
             extractedData.push({
-                prompt: extractCodeBlocks(prompt),
-                answer: extractCodeBlocks(answer),
-                images: images.length > 0 ? images : undefined
+                prompt,
+                answer,
+                images: images.length > 0 ? images : undefined,
+                codeBlocks: codeBlocks.length > 0 ? codeBlocks : undefined
             });
         }
     }
@@ -93,7 +112,7 @@ browser.runtime.onMessage.addListener((message: Message) => {
     
     if (message.type === 'EXTRACT_DATA') {
         try {
-            const data = extractData(message.config);
+            const data = extractData();
             console.log('Extracted data:', data);
             return Promise.resolve(data);
         } catch (error) {
