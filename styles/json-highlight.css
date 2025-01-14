@@ -1,0 +1,37 @@
+.json-container {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 12px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.json-key {
+    color: #0550ae;
+}
+
+.json-string {
+    color: #22863a;
+}
+
+.json-number {
+    color: #e36209;
+}
+
+.json-boolean {
+    color: #005cc5;
+}
+
+.json-null {
+    color: #6a737d;
+}
+
+.json-bracket {
+    color: #24292e;
+}
+
+.json-comma {
+    color: #24292e;
+} 

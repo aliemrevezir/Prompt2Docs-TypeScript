@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Prompt2Docs</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <link rel="stylesheet" href="styles/popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Prompt2Docs</h1>
+            <button id="settingsBtn" class="icon-button" title="Settings">
+                <span class="material-icons-round">settings</span>
+            </button>
+        </header>
+
+        <div class="button-container">
+            <button id="extractBtn" class="icon-button" title="Extract Conversations">
+                <span class="material-icons-round">download</span>
+            </button>
+            <button id="selectAllBtn" class="icon-button" disabled title="Select All">
+                <span class="material-icons-round">select_all</span>
+            </button>
+            <button id="downloadBtn" class="icon-button" disabled title="Download Selected">
+                <span class="material-icons-round">save_alt</span>
+            </button>
+        </div>
+
+        <div id="status" class="status"></div>
+        <div id="selectedCount" class="selected-count"></div>
+        
+        <div class="content-area">
+            <div id="conversations" class="conversations-container"></div>
+            <div id="result" class="json-container"></div>
+        </div>
+
+        <footer>
+            <p>Made with <span class="material-icons-round heart">favorite</span> by <a href="https://wezirim.com" target="_blank">Prompt2Docs Team</a></p>
+        </footer>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsOverlay"></div>
+    <div id="settingsPanel" class="modal">
+        <div class="modal-header">
+            <h3>Settings</h3>
+            <button id="closeSettingsBtn" class="icon-button" title="Close">
+                <span class="material-icons-round">close</span>
+            </button>
+        </div>
+        <div class="modal-content">
+            <!-- Platform Settings -->
+            <div class="settings-group">
+                <h4>Platform</h4>
+                <div class="setting-item">
+                    <div class="select-wrapper">
+                        <select id="platform">
+                            <option value="chatgpt">ChatGPT</option>
+                        </select>
+                        <span class="material-icons-round">expand_more</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Settings -->
+            <div class="settings-group">
+                <h4>Content</h4>
+                <div class="setting-item">
+                    <label class="toggle-label" for="includePrompts">
+                        <span>Include Prompts</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="includePrompts" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label class="toggle-label" for="includeResponses">
+                        <span>Include Responses</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="includeResponses" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label class="toggle-label" for="includeMetadata">
+                        <span>Include Metadata</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="includeMetadata">
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label class="toggle-label" for="preserveLineBreaks">
+                        <span>Preserve Line Breaks</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="preserveLineBreaks" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Formatting Settings -->
+            <div class="settings-group">
+                <h4>Formatting</h4>
+                <div class="setting-item">
+                    <label class="toggle-label" for="formatCodeBlocks">
+                        <span>Format Code Blocks</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="formatCodeBlocks">
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label class="toggle-label" for="prettyPrintJSON">
+                        <span>Pretty Print JSON</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="prettyPrintJSON" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Labels Settings -->
+            <div class="settings-group">
+                <h4>Labels</h4>
+                <div class="setting-item">
+                    <label for="promptLabel">Prompt Label</label>
+                    <input type="text" id="promptLabel" placeholder="e.g., Question">
+                </div>
+                <div class="setting-item">
+                    <label for="responseLabel">Response Label</label>
+                    <input type="text" id="responseLabel" placeholder="e.g., Answer">
+                </div>
+            </div>
+
+            <!-- Export Settings -->
+            <div class="settings-group">
+                <h4>Export</h4>
+                <div class="setting-item">
+                    <label class="toggle-label" for="autoGenerateFilename">
+                        <span>Auto-generate Filename</span>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="autoGenerateFilename" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            Made with <span class="material-icons-round heart">favorite</span> by <a href="https://wezirim.com" target="_blank">Prompt2Docs Team</a>
+        </div>
+    </div>
+
+    <script src="dist/popup.js"></script>
+</body>
+</html> 
