@@ -3,11 +3,17 @@ export interface CodeBlock {
     code: string;
 }
 
+export interface LatexBlock {
+    formula: string;
+    displayMode: boolean;
+}
+
 export interface ConversationItem {
     prompt: string;
     answer: string;
     images?: string[];
-    codeBlocks?: CodeBlock[];
+    codeBlocks?: { language: string; code: string }[];
+    latexBlocks?: { formula: string; displayMode: boolean }[];
 }
 
 export interface Metadata {
@@ -30,29 +36,31 @@ export interface Message {
 }
 
 export interface Settings {
-    platform: string;
+    exportFormat: 'json' | 'markdown';
+    includeMetadata: boolean;
     includePrompts: boolean;
     includeResponses: boolean;
-    includeMetadata: boolean;
     preserveLineBreaks: boolean;
     formatCodeBlocks: boolean;
+    formatLatex: boolean;
     prettyPrintJSON: boolean;
+    autoGenerateFilename: boolean;
+    platform: string;
     promptLabel: string;
     responseLabel: string;
-    autoGenerateFilename: boolean;
-    exportFormat: 'json' | 'markdown';
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-    platform: 'chatgpt',
+    exportFormat: 'json',
+    includeMetadata: true,
     includePrompts: true,
     includeResponses: true,
-    includeMetadata: false,
     preserveLineBreaks: true,
     formatCodeBlocks: true,
+    formatLatex: true,
     prettyPrintJSON: true,
-    promptLabel: 'prompt',
-    responseLabel: 'response',
     autoGenerateFilename: true,
-    exportFormat: 'markdown'
+    platform: 'ChatGPT',
+    promptLabel: 'prompt',
+    responseLabel: 'response'
 }; 

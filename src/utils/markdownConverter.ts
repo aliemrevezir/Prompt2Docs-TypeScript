@@ -35,7 +35,22 @@ export function convertToMarkdown(
 
             if (settings.includeResponses) {
                 markdown += '### 🤖 Assistant\n\n';
-                markdown += `${formatText(conv.answer)}\n\n`;
+                
+                // Process answer text with LaTeX placeholders
+                let answerText = formatText(conv.answer);
+                
+                // Replace LaTeX placeholders with actual formulas
+                if (conv.latexBlocks && conv.latexBlocks.length > 0) {
+                    conv.latexBlocks.forEach((block, index) => {
+                        const placeholder = `[LATEX_BLOCK_${index}]`;
+                        const formula = block.displayMode 
+                            ? `\n$$${block.formula}$$\n`
+                            : `$${block.formula}$`;
+                        answerText = answerText.replace(placeholder, formula);
+                    });
+                }
+                
+                markdown += `${answerText}\n\n`;
 
                 // Handle code blocks if present
                 if (settings.formatCodeBlocks && conv.codeBlocks && conv.codeBlocks.length > 0) {
@@ -45,6 +60,19 @@ export function convertToMarkdown(
                         markdown += `<summary>Code Example ${blockIndex + 1} (${block.language})</summary>\n\n`;
                         markdown += '```' + block.language + '\n';
                         markdown += block.code + '\n';
+                        markdown += '```\n\n';
+                        markdown += '</details>\n\n';
+                    });
+                }
+
+                // Handle LaTeX blocks in a separate section
+                if (conv.latexBlocks && conv.latexBlocks.length > 0) {
+                    markdown += '#### 📐 LaTeX Formulas\n\n';
+                    conv.latexBlocks.forEach((block, blockIndex) => {
+                        markdown += `<details>\n`;
+                        markdown += `<summary>Formula ${blockIndex + 1} (${block.displayMode ? 'Display' : 'Inline'})</summary>\n\n`;
+                        markdown += '```latex\n';
+                        markdown += block.formula + '\n';
                         markdown += '```\n\n';
                         markdown += '</details>\n\n';
                     });

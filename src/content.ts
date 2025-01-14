@@ -1,5 +1,6 @@
 import browser from 'webextension-polyfill';
 import { ConversationItem, Message } from './types';
+import { processLatexInConversation } from './utils/latexExtractor';
 
 function getElementByXPath(xpath: string): Element | null {
     const result = document.evaluate(
@@ -59,6 +60,48 @@ function extractCodeBlocksFromArticle(article: Element): { language: string; cod
     return codeBlocks;
 }
 
+function convertHtmlToText(html: string): string {
+    // Create a temporary div to parse HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+
+    // Convert specific elements to markdown-like format
+    const elements = tempDiv.querySelectorAll('*');
+    elements.forEach(element => {
+        if (element.tagName === 'H1') {
+            element.textContent = `\n# ${element.textContent}\n`;
+        } else if (element.tagName === 'H2') {
+            element.textContent = `\n## ${element.textContent}\n`;
+        } else if (element.tagName === 'H3') {
+            element.textContent = `\n### ${element.textContent}\n`;
+        } else if (element.tagName === 'P') {
+            element.textContent = `\n${element.textContent}\n`;
+        } else if (element.tagName === 'UL') {
+            const items = Array.from(element.children)
+                .map(li => `\n- ${li.textContent?.trim()}`)
+                .join('');
+            element.textContent = items + '\n';
+        } else if (element.tagName === 'OL') {
+            const items = Array.from(element.children)
+                .map((li, index) => `\n${index + 1}. ${li.textContent?.trim()}`)
+                .join('');
+            element.textContent = items + '\n';
+        } else if (element.tagName === 'HR') {
+            element.textContent = '\n---\n';
+        } else if (element.tagName === 'STRONG' || element.tagName === 'B') {
+            element.textContent = `**${element.textContent}**`;
+        } else if (element.tagName === 'EM' || element.tagName === 'I') {
+            element.textContent = `*${element.textContent}*`;
+        }
+    });
+
+    // Get text content and clean up extra whitespace
+    let text = tempDiv.textContent || '';
+    text = text.replace(/\n\s+/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    
+    return text;
+}
+
 function extractData(): ConversationItem[] {
     const extractedData: ConversationItem[] = [];
     const baseArticle = "/html/body/div[1]/div[2]/main/div[1]/div[1]/div/div/div/div/article";
@@ -80,8 +123,31 @@ function extractData(): ConversationItem[] {
         
         // Extract response
         const responseElement = responseArticle.querySelector('.text-base');
-        const answer = responseElement?.textContent?.trim() || '';
-        
+        const answer = responseElement?.innerHTML?.trim() || '';
+
+        // Extract LaTeX blocks and replace with placeholders
+        const latexBlocks: { formula: string; displayMode: boolean }[] = [];
+        let processedAnswer = answer;
+
+        // Find all KaTeX elements
+        const katexElements = responseArticle.querySelectorAll('.katex-display, .katex:not(.katex-display .katex)');
+        katexElements.forEach((katexElement, index) => {
+            const displayMode = katexElement.classList.contains('katex-display');
+            const annotation = katexElement.querySelector('.katex-html annotation[encoding="application/x-tex"]');
+            
+            if (annotation) {
+                const formula = annotation.textContent || '';
+                latexBlocks.push({ formula, displayMode });
+                
+                // Create placeholder and replace the LaTeX content
+                const placeholder = displayMode ? `\n(Formula_${index + 1})\n` : `(Formula_${index + 1})`;
+                processedAnswer = processedAnswer.replace(katexElement.outerHTML, placeholder);
+            }
+        });
+
+        // Convert HTML to readable text
+        processedAnswer = convertHtmlToText(processedAnswer);
+
         // Extract code blocks from response article
         const codeBlocks = extractCodeBlocksFromArticle(responseArticle);
         
@@ -93,16 +159,27 @@ function extractData(): ConversationItem[] {
             if (src) images.push(src);
         });
         
-        if (prompt && answer) {
-            extractedData.push({
+        if (prompt && processedAnswer) {
+            // Create initial conversation object
+            let conversation: ConversationItem = {
                 prompt,
-                answer,
+                answer: processedAnswer,
                 images: images.length > 0 ? images : undefined,
-                codeBlocks: codeBlocks.length > 0 ? codeBlocks : undefined
-            });
+                codeBlocks: codeBlocks.length > 0 ? codeBlocks : undefined,
+                // Only include latexBlocks if formatLatex is true and there are blocks
+                latexBlocks: latexBlocks.length > 0 ? latexBlocks : undefined
+            };
+
+            // Process LaTeX content if needed
+            if (latexBlocks.length > 0) {
+                conversation = processLatexInConversation(conversation);
+            }
+            
+            console.log('Processed conversation:', conversation); // Debug log
+            extractedData.push(conversation);
         }
     }
-    
+
     return extractedData;
 }
 

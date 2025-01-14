@@ -97,11 +97,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     requiredElements.downloadBtn.addEventListener('click', async () => {
         try {
-            const selectedItems = document.querySelectorAll('.conversation-item.selected');
-            const selectedIndices = Array.from(selectedItems).map(item => 
-                parseInt(item.getAttribute('data-index') || '0', 10));
-            
-            const selectedData = selectedIndices.map(index => selectedConversations[index]);
+        const selectedItems = document.querySelectorAll('.conversation-item.selected');
+        const selectedIndices = Array.from(selectedItems).map(item => 
+            parseInt(item.getAttribute('data-index') || '0', 10));
+        
+        const selectedData = selectedIndices.map(index => selectedConversations[index]);
             const formattedData = await formatConversationData(selectedData);
             
             downloadData(formattedData);
@@ -143,16 +143,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.setting-item input, .setting-item select').forEach(element => {
         element.addEventListener('change', async (event) => {
             try {
-                const target = event.target as HTMLInputElement | HTMLSelectElement;
-                const newSettings = { ...currentSettings };
-                const settingKey = target.id as keyof Settings;
+            const target = event.target as HTMLInputElement | HTMLSelectElement;
+            const newSettings = { ...currentSettings };
+            const settingKey = target.id as keyof Settings;
                 let valueChanged = false;
 
-                if (target instanceof HTMLInputElement) {
-                    if (target.type === 'checkbox') {
+            if (target instanceof HTMLInputElement) {
+                if (target.type === 'checkbox') {
                         valueChanged = (newSettings[settingKey] as boolean) !== target.checked;
-                        (newSettings[settingKey] as boolean) = target.checked;
-                    } else {
+                    (newSettings[settingKey] as boolean) = target.checked;
+                } else {
                         valueChanged = (newSettings[settingKey] as string) !== target.value;
                         (newSettings[settingKey] as string) = target.value;
                     }
@@ -271,8 +271,92 @@ function normalizeLanguage(lang: string): string {
     return languageMap[lang] || lang;
 }
 
+// Add helper function for LaTeX block extraction
+function extractLatexBlocks(text: string): { text: string; latexBlocks: Array<{ formula: string; displayMode: boolean }> } {
+    const latexBlocks: Array<{ formula: string; displayMode: boolean }> = [];
+    const latexMap = new Map<string, { formula: string; displayMode: boolean }>();
+    let modifiedText = text;
+    let blockIndex = 0;
+    
+    // First pass: Find and store LaTeX content
+    const patterns = [
+        // KaTeX rendered elements (highest priority)
+        {
+            pattern: /<span class="katex-display"><span class="katex">([\s\S]*?)<\/span><\/span>/g,
+            isDisplay: true
+        },
+        {
+            pattern: /<span class="katex">([\s\S]*?)<\/span>/g,
+            isDisplay: false
+        },
+        // Fallback to raw LaTeX patterns
+        {
+            pattern: /\$\$([\s\S]*?)\$\$/g,
+            isDisplay: true
+        },
+        {
+            pattern: /\$([^$]+)\$/g,
+            isDisplay: false
+        }
+    ];
+
+    // Process each pattern
+    patterns.forEach(({ pattern, isDisplay }) => {
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+            const originalText = match[0];
+            let formula = '';
+
+            // Extract formula from KaTeX element
+            if (originalText.includes('katex')) {
+                const annotation = originalText.match(/<annotation.*?>(.*?)<\/annotation>/);
+                if (annotation) {
+                    formula = annotation[1].trim();
+                }
+            } else {
+                // Raw LaTeX - remove delimiters
+                formula = match[1].trim();
+            }
+
+            if (formula) {
+                formula = cleanLatexFormula(formula);
+                const key = `[LATEX_BLOCK_${blockIndex}]`;
+                latexMap.set(key, { formula, displayMode: isDisplay });
+                blockIndex++;
+            }
+        }
+    });
+
+    // Second pass: Replace LaTeX content with placeholders
+    modifiedText = text;
+    latexMap.forEach((value, key) => {
+        const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedKey, 'g');
+        modifiedText = modifiedText.replace(regex, key);
+        latexBlocks.push(value);
+    });
+
+    // Clear the temporary map
+    latexMap.clear();
+    
+    return { text: modifiedText, latexBlocks };
+}
+
+function cleanLatexFormula(formula: string): string {
+    return formula
+        .trim()
+        .replace(/\\[\\]*/g, '\\')  // Fix multiple backslashes
+        .replace(/\s+/g, ' ')       // Normalize whitespace
+        .replace(/\$+/g, '')        // Remove dollar signs
+        .replace(/\\left\(/g, '(')  // Simplify parentheses
+        .replace(/\\right\)/g, ')')
+        .replace(/\\begin\{.*?\}/g, '') // Remove environment declarations
+        .replace(/\\end\{.*?\}/g, '')
+        .trim();
+}
+
 async function formatConversationData(conversations: ConversationItem[]): Promise<any> {
-    const formattedData: any = {};
+        const formattedData: any = {};
     
     // Add metadata if enabled
     if (currentSettings.includeMetadata) {
@@ -289,12 +373,16 @@ async function formatConversationData(conversations: ConversationItem[]): Promis
     
     // Add conversations
     formattedData.conversations = conversations.map(conversation => {
+        // Process text for LaTeX blocks
+        const { text: processedAnswer, latexBlocks } = extractLatexBlocks(conversation.answer);
+        
         // For markdown export, keep the original structure
         if (currentSettings.exportFormat === 'markdown') {
             return {
                 prompt: conversation.prompt,
-                answer: conversation.answer,
+                answer: currentSettings.formatLatex ? processedAnswer : conversation.answer,
                 codeBlocks: conversation.codeBlocks,
+                latexBlocks: currentSettings.formatLatex ? latexBlocks : [],
                 images: conversation.images
             };
         }
@@ -309,11 +397,17 @@ async function formatConversationData(conversations: ConversationItem[]): Promis
         
         if (currentSettings.includeResponses) {
             formattedConversation[currentSettings.responseLabel] = currentSettings.preserveLineBreaks ? 
-                conversation.answer : conversation.answer.replace(/\n/g, ' ');
+                (currentSettings.formatLatex ? processedAnswer : conversation.answer) : 
+                (currentSettings.formatLatex ? processedAnswer : conversation.answer).replace(/\n/g, ' ');
             
             // Add code blocks if enabled and available
             if (currentSettings.formatCodeBlocks && conversation.codeBlocks && conversation.codeBlocks.length > 0) {
                 formattedConversation[`${currentSettings.responseLabel}CodeBlocks`] = conversation.codeBlocks;
+            }
+
+            // Add LaTeX blocks if enabled and available
+            if (currentSettings.formatLatex && latexBlocks.length > 0) {
+                formattedConversation[`${currentSettings.responseLabel}LaTeXBlocks`] = latexBlocks;
             }
         }
         
@@ -350,7 +444,7 @@ async function downloadData(data: any) {
         } else {
             try {
                 content = currentSettings.prettyPrintJSON ? 
-                    JSON.stringify(data, null, 2) : JSON.stringify(data);
+        JSON.stringify(data, null, 2) : JSON.stringify(data);
                 fileExtension = 'json';
                 mimeType = 'application/json';
                 showNotification('JSON file created successfully', 'success');
@@ -363,19 +457,19 @@ async function downloadData(data: any) {
 
         // Create and download the file
         const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        const filename = currentSettings.autoGenerateFilename ? 
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    const filename = currentSettings.autoGenerateFilename ? 
             `conversations_${getCurrentDateTime().replace(/[: ]/g, '_')}.${fileExtension}` : 
             `conversations.${fileExtension}`;
-        
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+    
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     } catch (error) {
         console.error('Error in file download:', error);
         showNotification('Failed to download file', 'error');
